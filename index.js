@@ -54,7 +54,7 @@ client.on("message_create", async (msg) => {
 // Handle message from the others
 client.on("message", async (msg) => {
   console.log({ message: msg });
-  if (checkInValidRoom(msg.to)) return;
+  if (checkInValidRoom(msg.from)) return;
 
   if (!msg.fromMe) {
     await sendTon8n(msg);
