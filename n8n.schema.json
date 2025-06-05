@@ -1,0 +1,595 @@
+{
+  "name": "My workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "whatsapp-incoming",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        200,
+        -40
+      ],
+      "id": "b8f82ff9-592d-4eed-92c8-65a9ee3c36d6",
+      "name": "Webhook",
+      "webhookId": "9b4c8dd8-9dbe-46c7-8070-d7dadd130c96"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $('Webhook').item.json.body.body }}",
+        "options": {
+          "systemMessage": "=You are a helpful and intelligent finance assistant. Please respond in Bahasa Indonesia. Always use the history transaction data if needed. your chat style should be Humorous & Fun.\n\nThe current date and time is:\n{{ $now.setZone('Asia/Jakarta').toISO() }}\n\nHistory Transaction Data: {{ JSON.stringify($('Google Sheets').all()) }}\n\nYour tasks depend on the user's message type:\n- If the user wants to read transactions (e.g., asking for balance, list of spendings, transaction history), set type to read_transaction.\n- If the user wants to create a new transaction (record a new one), set type to create_transaction. Required fields: date (if empty, use today’s date), amount, description, direction (\"in\" or \"out\" based on user message).\n- Otherwise, set the type to other.\n\nTask handling:\n- For read_transaction, use the provided history transaction data, process the data e.g. 2 in transaction with same desc then sum it.\n- For create_transaction, do not reconfirm or ask questions unless data is missing. Provide insights (not questions) about the user’s transactions this week based on provided history transaction data. \n\nPlease carefully determine the type. In the reason property, explain briefly why you chose that type.\nSometimes user write a nominal with said 10rb atau 10ribu which means 10000, and 10jt or 10juta which means 10000000 and others, ensure you process the amount and return as number \n\n\nReturn only a valid JSON object in this format:\n{\n  \"type\": \"create_transaction\" | \"read_transaction\" | \"other\",\n  \"reason\": \"string\",\n  \"ai_message\": \"string\",\n  \"create_data\": {\n    \"date\": \"YYYY-MM-DD\",\n    \"amount\": integer or number e.g. 100000,\n    \"description\": \"string\",\n    \"direction\": \"in\" | \"out\"\n}"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2,
+      "position": [
+        660,
+        0
+      ],
+      "id": "bf5f0d47-70c5-4124-b902-42cfbe2bedf8",
+      "name": "AI Agent",
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-2.0-flash-001",
+        "options": {
+          "temperature": 0
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        540,
+        220
+      ],
+      "id": "7e0e1425-4c46-460b-9b59-8eabf327c266",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "F4aAcLNYYW80uLHI",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:3000/send-reply",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "=message",
+              "value": "=*AI Assistant:*\n\n{{ $('Code').item.json.ai_message }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1640,
+        0
+      ],
+      "id": "876b2875-20d0-4f90-884f-fb2b0f79efd2",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "e576362d-695a-486b-9463-3953543fb833",
+                    "leftValue": "={{ $json.type }}",
+                    "rightValue": "create_transaction",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Create Transaction"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.type }}",
+                    "rightValue": "other",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "46062daa-8497-413b-94f4-62cc5d3cd819"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Other"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "09251292-e961-4102-bc61-0e15d55e237d",
+                    "leftValue": "={{ $json.type }}",
+                    "rightValue": "read_transaction",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Read Transaction"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        1180,
+        0
+      ],
+      "id": "008cd6e5-7b99-408c-bd6b-0181442cf441",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json.output;\nconst cleaned = raw.replace('```json', '').replace('```', '')\nconst parsed = JSON.parse(cleaned);\n\nreturn { json: parsed };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1000,
+        0
+      ],
+      "id": "e638b3e2-9f40-40d0-8f71-1e5388fff305",
+      "name": "Code"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1OpCeK-FRMXim60_yXQLfo045lf5m5uUdASH_1dptqtI",
+          "mode": "list",
+          "cachedResultName": "Catatan Keuangan",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1OpCeK-FRMXim60_yXQLfo045lf5m5uUdASH_1dptqtI/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "={{ new Date().toLocaleString('en-US', { month: 'long' }) }}",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Date": "={{ $json.create_data.date }}",
+            "Description": "={{ $json.create_data.description }}",
+            "Direction": "={{ $json.create_data.direction }}",
+            "Amount": "={{ $json.create_data.amount }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Date",
+              "displayName": "Date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Direction",
+              "displayName": "Direction",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Description",
+              "displayName": "Description",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Amount",
+              "displayName": "Amount",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "cellFormat": "USER_ENTERED"
+        }
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.6,
+      "position": [
+        1440,
+        -140
+      ],
+      "id": "2b0d0c5c-1a28-44dd-b93a-572d5e47011f",
+      "name": "Google Sheets1",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "mJtmlYRTCdduINqt",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Webhook').item.json.body.to }}",
+        "contextWindowLength": 15
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        720,
+        220
+      ],
+      "id": "19d609dc-4e5e-4a9d-9bc7-e70aba1e8a95",
+      "name": "Simple Memory"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1OpCeK-FRMXim60_yXQLfo045lf5m5uUdASH_1dptqtI",
+          "mode": "list",
+          "cachedResultName": "Catatan Keuangan",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1OpCeK-FRMXim60_yXQLfo045lf5m5uUdASH_1dptqtI/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "={{ new Date().toLocaleString('en-US', { month: 'long' }) }}",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.6,
+      "position": [
+        460,
+        0
+      ],
+      "id": "fa75a346-c0d3-4bb6-a3f4-880e8c83edc6",
+      "name": "Google Sheets",
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "mJtmlYRTCdduINqt",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 19
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        200,
+        -360
+      ],
+      "id": "640444c7-85ee-48a2-90c4-b97b28eecbe4",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1OpCeK-FRMXim60_yXQLfo045lf5m5uUdASH_1dptqtI",
+          "mode": "list",
+          "cachedResultName": "Catatan Keuangan",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1OpCeK-FRMXim60_yXQLfo045lf5m5uUdASH_1dptqtI/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "={{ new Date().toLocaleString('en-US', { month: 'long' }) }}",
+          "mode": "name"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "Date",
+              "lookupValue": "={{  $now.setZone('Asia/Jakarta').format('dd/MM/yyyy') }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.6,
+      "position": [
+        420,
+        -360
+      ],
+      "id": "9b77ed96-db6c-42f5-858c-798ac1ab939a",
+      "name": "Google Sheets2",
+      "alwaysOutputData": true,
+      "executeOnce": false,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "mJtmlYRTCdduINqt",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "f9324466-1a76-40e8-82ea-250d07bdc10d",
+              "leftValue": "={{ $json.isEmpty() }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        620,
+        -360
+      ],
+      "id": "4e4bcbbf-3fa4-4172-b1cf-da87c908e7ae",
+      "name": "If",
+      "executeOnce": false
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:3000/send-reply",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "=message",
+              "value": "=*AI Assistant:*\n\nJangan lupa catat transaksi hari ini ya! Biar keuangan tetap rapi dan dompet makin happy 😄💸"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1020,
+        -360
+      ],
+      "id": "37f319ba-d9cc-41bf-88a1-393091a142c0",
+      "name": "HTTP Request1"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Google Sheets1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Sheets1": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Sheets": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Google Sheets2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Sheets2": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "HTTP Request1": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "d84446ef-af48-4df3-b81e-2cf3cf5e3b8f",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "06b0d5d7324a286cf1d0271971f127e095400794650582057d77cf90689b95f4"
+  },
+  "id": "eKbdpztdeTsTjGnW",
+  "tags": []
+}
